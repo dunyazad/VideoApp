@@ -23,6 +23,30 @@ else()
 	)
 endif()
 
-add_executable(VideoApp src/main.cpp)
+include_directories(
+	./lib/FFmpeg/include
+)
+
+link_directories(
+	./lib/FFmpeg/bin
+)
+
+link_libraries(
+	avcodec
+	avdevice
+	avfilter
+	avformat
+	avutil
+	postproc
+	swresample
+	swscale
+)
+
+list(APPEND SOURCES
+	src/main.cpp
+	src/loadFrame.cpp
+)
+
+add_executable(VideoApp ${SOURCES})
 target_link_libraries(VideoApp glfw ${EXTRA_LIBS})
 
