@@ -1,77 +1,102 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <GLFW/glfw3.h>
+#include "video_reader.hpp"
 
-bool loadFrame(const char* fileName, int* width, int* height, unsigned char** data);
+#define posix_memalign(p, a, s) (((*(p)) = _aligned_malloc((s), (a))), *(p) ?0 :errno)
 
-int main(int argc, char** argv) {
-	GLFWwindow* window;
+int main(int argc, const char** argv) {
+    GLFWwindow* window;
 
-	if (!glfwInit()) {
-		printf("Could not init GLFW\n");
-		return 1;
-	}
+    if (!glfwInit()) {
+        printf("Couldn't init GLFW\n");
+        return 1;
+    }
 
-	window = glfwCreateWindow(640, 480, "Hello World", nullptr, nullptr);
-	if (!window) {
-		printf("Could not open window\n");
-		return 1;
-	}
+    window = glfwCreateWindow(800, 480, "Hello World", NULL, NULL);
+    if (!window) {
+        printf("Couldn't open window\n");
+        return 1;
+    }
 
-	int frameWidth = 0;
-	int frameHeight = 0;
-	unsigned char* frameData;
-	if (!loadFrame("D:\\Resources\\Video\\too_cute.mp4", &frameWidth, &frameHeight, &frameData)) {
-		printf("Could not load video frame\n");
-		return 1;
-	}
+    VideoReaderState vr_state;
+    if (!video_reader_open(&vr_state, "D:\\Resources\\Video\\video.mp4")) {
+        printf("Couldn't open video file (make sure you set a video file that exists)\n");
+        return 1;
+    }
 
-	glfwMakeContextCurrent(window);
+    glfwMakeContextCurrent(window);
 
-	glClearColor(0.3, 0.5, 0.7, 1.0);
+    // Generate texture
+    GLuint tex_handle;
+    glGenTextures(1, &tex_handle);
+    glBindTexture(GL_TEXTURE_2D, tex_handle);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 
-	GLuint textureID = -1;
-	glGenTextures(1, &textureID);
-	glBindTexture(GL_TEXTURE_2D, textureID);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    // Allocate frame buffer
+    constexpr int ALIGNMENT = 128;
+    const int frame_width = vr_state.width;
+    const int frame_height = vr_state.height;
+    uint8_t* frame_data;
+    if (posix_memalign((void**)&frame_data, ALIGNMENT, frame_width * frame_height * 4) != 0) {
+        printf("Couldn't allocate frame buffer\n");
+        return 1;
+    }
 
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, frameWidth, frameHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, frameData);
+    while (!glfwWindowShouldClose(window)) {
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	glBindTexture(GL_TEXTURE_2D, 0);
+        // Set up orphographic projection
+        int window_width, window_height;
+        glfwGetFramebufferSize(window, &window_width, &window_height);
+        glMatrixMode(GL_PROJECTION);
+        glLoadIdentity();
+        glOrtho(0, window_width, window_height, 0, -1, 1);
+        glMatrixMode(GL_MODELVIEW);
 
-	//delete data;
+        // Read a new frame and load it into texture
+        int64_t pts;
+        if (!video_reader_read_frame(&vr_state, frame_data, &pts)) {
+            printf("Couldn't load video frame\n");
+            return 1;
+        }
 
-	while (!glfwWindowShouldClose(window)) {
+        static bool first_frame = true;
+        if (first_frame) {
+            glfwSetTime(0.0);
+            first_frame = false;
+        }
 
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		//glDrawPixels(255, 255, GL_RGB, GL_UNSIGNED_BYTE, data);
+        double pt_in_seconds = pts * (double)vr_state.time_base.num / (double)vr_state.time_base.den;
+        while (pt_in_seconds > glfwGetTime()) {
+            glfwWaitEventsTimeout(pt_in_seconds - glfwGetTime());
+        }
 
-		int windowWidth = 0;
-		int windowHeight = 0;
-		glfwGetFramebufferSize(window, &windowWidth, &windowHeight);
+        glBindTexture(GL_TEXTURE_2D, tex_handle);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, frame_width, frame_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, frame_data);
 
-		glMatrixMode(GL_PROJECTION);
-		glLoadIdentity();
-		glOrtho(0, windowWidth, 0, windowHeight, -1, 1);
+        // Render whatever you want
+        glEnable(GL_TEXTURE_2D);
+        glBindTexture(GL_TEXTURE_2D, tex_handle);
+        glBegin(GL_QUADS);
+        glTexCoord2d(0, 0); glVertex2i(200, 200);
+        glTexCoord2d(1, 0); glVertex2i(200 + frame_width, 200);
+        glTexCoord2d(1, 1); glVertex2i(200 + frame_width, 200 + frame_height);
+        glTexCoord2d(0, 1); glVertex2i(200, 200 + frame_height);
+        glEnd();
+        glDisable(GL_TEXTURE_2D);
 
-		glMatrixMode(GL_MODELVIEW);
+        glfwSwapBuffers(window);
+        glfwPollEvents();
+    }
 
-		glEnable(GL_TEXTURE_2D);
-		glBindTexture(GL_TEXTURE_2D, textureID);
-		glBegin(GL_QUADS);
-		glTexCoord2d(0, 1); glVertex2i(0, 0);
-		glTexCoord2d(1, 1); glVertex2i(frameWidth, 0);
-		glTexCoord2d(1, 0); glVertex2i(frameWidth, frameHeight);
-		glTexCoord2d(0, 0); glVertex2i(0, frameHeight);
-		glEnd();
-		glDisable(GL_TEXTURE_2D);
+    video_reader_close(&vr_state);
 
-		glfwSwapBuffers(window);
-
-		glfwWaitEvents();
-	}
-
-	return 0;
+    return 0;
 }
+
