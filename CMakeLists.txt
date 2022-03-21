@@ -44,7 +44,7 @@ link_libraries(
 
 list(APPEND SOURCES
 	src/main.cpp
-	src/loadFrame.cpp
+	src/video_reader.cpp
 )
 
 add_executable(VideoApp ${SOURCES})
