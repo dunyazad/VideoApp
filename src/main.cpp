@@ -20,7 +20,7 @@ int main(int argc, char** argv) {
 	int frameWidth = 0;
 	int frameHeight = 0;
 	unsigned char* frameData;
-	if (!loadFrame("D:\\Resources\\Video\\video.mp4", &frameWidth, &frameHeight, &frameData)) {
+	if (!loadFrame("D:\\Resources\\Video\\too_cute.mp4", &frameWidth, &frameHeight, &frameData)) {
 		printf("Could not load video frame\n");
 		return 1;
 	}
@@ -28,26 +28,6 @@ int main(int argc, char** argv) {
 	glfwMakeContextCurrent(window);
 
 	glClearColor(0.3, 0.5, 0.7, 1.0);
-
-	//unsigned char* data = new unsigned char[256 * 256 * 3];
-	//for (size_t y = 0; y < 255; y++)
-	//{
-	//	for (size_t x = 0; x < 255; x++)
-	//	{
-	//		data[y * 256 * 3 + x * 3 + 0] = 0;
-	//		data[y * 256 * 3 + x * 3 + 1] = 255;
-	//		data[y * 256 * 3 + x * 3 + 2] = 0;
-	//	}
-	//}
-	//for (size_t y = 64; y < 192; y++)
-	//{
-	//	for (size_t x = 64; x < 192; x++)
-	//	{
-	//		data[y * 256 * 3 + x * 3 + 0] = 255;
-	//		data[y * 256 * 3 + x * 3 + 1] = 255;
-	//		data[y * 256 * 3 + x * 3 + 2] = 0;
-	//	}
-	//}
 
 	GLuint textureID = -1;
 	glGenTextures(1, &textureID);
@@ -81,10 +61,10 @@ int main(int argc, char** argv) {
 		glEnable(GL_TEXTURE_2D);
 		glBindTexture(GL_TEXTURE_2D, textureID);
 		glBegin(GL_QUADS);
-		glTexCoord2d(0, 0); glVertex2i(0, 0);
-		glTexCoord2d(1, 0); glVertex2i(frameWidth, 0);
-		glTexCoord2d(1, 1); glVertex2i(frameWidth, frameHeight);
-		glTexCoord2d(0, 1); glVertex2i(0, frameHeight);
+		glTexCoord2d(0, 1); glVertex2i(0, 0);
+		glTexCoord2d(1, 1); glVertex2i(frameWidth, 0);
+		glTexCoord2d(1, 0); glVertex2i(frameWidth, frameHeight);
+		glTexCoord2d(0, 0); glVertex2i(0, frameHeight);
 		glEnd();
 		glDisable(GL_TEXTURE_2D);
 
